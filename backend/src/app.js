@@ -51,7 +51,9 @@ app.use('/api/auth/forgot-password', authLimiter);
 
 
 app.use(express.json({ limit: '2mb' }));
-app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
+if (env.nodeEnv !== 'production' || process.env.ENABLE_HTTP_LOGS === 'true') {
+  app.use(morgan(env.nodeEnv === 'production' ? 'tiny' : 'dev'));
+}
 app.use(
   rateLimit({
     windowMs: env.rateLimitWindowMs,

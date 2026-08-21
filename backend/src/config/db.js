@@ -32,6 +32,10 @@ async function connectDb() {
   try {
     await mongoose.connect(env.mongoUri, {
       serverSelectionTimeoutMS: 10000,
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE || 5),
+      minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE || 0),
+      maxIdleTimeMS: Number(process.env.MONGO_MAX_IDLE_TIME_MS || 30000),
+      waitQueueTimeoutMS: Number(process.env.MONGO_WAIT_QUEUE_TIMEOUT_MS || 10000),
     });
   } catch (error) {
     const wrappedError = new Error(`Failed to connect to MongoDB at ${maskMongoUri(env.mongoUri)}: ${error.message}`);

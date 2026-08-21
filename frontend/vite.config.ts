@@ -5,9 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import compression from 'vite-plugin-compression';
 
-const isProduction = process.env.NODE_ENV === 'production';
+export default defineConfig(({ mode }) => {
+  const isProduction = mode === 'production';
 
-export default defineConfig({
+  return {
   plugins: [
     react({
       // Fast Refresh optimization
@@ -23,7 +24,7 @@ export default defineConfig({
 
       },
       devOptions: {
-        enabled: true
+        enabled: !isProduction,
       },
       manifest: {
         name: 'Kapda Kraft',
@@ -93,7 +94,7 @@ export default defineConfig({
         comments: false,
       },
     },
-    sourcemap: !isProduction,
+    sourcemap: false,
     reportCompressedSize: isProduction,
     rollupOptions: {
       output: {
@@ -143,6 +144,6 @@ export default defineConfig({
       'axios',
       'lucide-react',
     ],
-    exclude: ['node_modules/.vite'],
   },
+  };
 });
