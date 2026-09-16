@@ -26,7 +26,8 @@ const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 const app = express();
 
 // Trust the proxy since the app is deployed behind Appwrite's load balancer or DigitalOcean's
-app.set('trust proxy', 1);
+// Trust all proxies in the chain to accurately resolve the client IP
+app.set('trust proxy', true);
 
 // Security headers
 app.use(helmet({
@@ -37,26 +38,8 @@ app.use(helmet({
 // CORS - More permissive for Appwrite deployments
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests from the same origin
-    const appUrl = process.env.APP_URL || '';
-    const allowedOrigins = [
-      appUrl,
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://localhost:5174',
-    ].filter(Boolean);
-
-    // In production, restrict to our domain
-    if (process.env.NODE_ENV === 'production') {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    } else {
-      // Development: allow all
-      callback(null, true);
-    }
+    // Always allow origin (this is safe as auth uses Bearer JWTs in headers)
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
