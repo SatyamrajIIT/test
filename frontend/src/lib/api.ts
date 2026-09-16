@@ -1,4 +1,6 @@
-const apiBase = import.meta.env.VITE_API_URL || '/api';
+import { getApiBaseUrl } from './apiClient';
+
+const apiBase = getApiBaseUrl();
 
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, { cache: 'no-store' });
