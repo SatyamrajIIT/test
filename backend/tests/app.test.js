@@ -4,7 +4,17 @@ jest.mock('../src/middleware/auth', () => (req, _res, next) => {
 });
 
 jest.mock('../src/models/Product', () => ({
-  find: jest.fn(() => ({ skip: () => ({ limit: () => ({ sort: async () => [] }) }) })),
+  find: jest.fn(() => ({
+    select: () => ({
+      skip: () => ({
+        limit: () => ({
+          sort: () => ({
+            lean: async () => [],
+          }),
+        }),
+      }),
+    }),
+  })),
   countDocuments: jest.fn(async () => 0),
 }));
 
