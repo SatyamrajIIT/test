@@ -101,6 +101,14 @@ module.exports = async ({ req, res, log, error }) => {
 
     const responseHeaders = {};
     for (const [key, value] of Object.entries(proxied.headers)) {
+      // Strip headers that interfere with Appwrite's response handling
+      if (
+        key.toLowerCase() === 'transfer-encoding' ||
+        key.toLowerCase() === 'connection' ||
+        key.toLowerCase() === 'keep-alive'
+      ) {
+        continue;
+      }
       if (value !== undefined) {
         responseHeaders[key] = Array.isArray(value) ? value.join(', ') : value;
       }
