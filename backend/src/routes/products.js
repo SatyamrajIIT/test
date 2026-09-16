@@ -9,10 +9,14 @@ const Category = require('../models/Category');
 const Brand = require('../models/Brand');
 
 const router = express.Router();
+const LIST_FIELDS = 'title description artistName productType category brand images price compareAtPrice stock isFeatured isCustomizable enableSizes sizes enableColors colors minDeliveryDays maxDeliveryDays tags salesCount createdAt';
+const SHORT_CACHE = 'public, max-age=120, stale-while-revalidate=300';
+const MEDIUM_CACHE = 'public, max-age=300, stale-while-revalidate=600';
 
 router.get('/categories', async (req, res, next) => {
   try {
-    const categories = await Category.find({ isActive: true }).sort({ name: 1 });
+    const categories = await Category.find({ isActive: true }).sort({ name: 1 }).lean();
+    res.set('Cache-Control', SHORT_CACHE);
     res.json(categories);
   } catch (error) {
     next(error);
@@ -21,7 +25,8 @@ router.get('/categories', async (req, res, next) => {
 
 router.get('/brands', async (req, res, next) => {
   try {
-    const brands = await Brand.find({ isActive: true }).sort({ name: 1 });
+    const brands = await Brand.find({ isActive: true }).sort({ name: 1 }).lean();
+    res.set('Cache-Control', SHORT_CACHE);
     res.json(brands);
   } catch (error) {
     next(error);
@@ -31,6 +36,7 @@ router.get('/brands', async (req, res, next) => {
 router.get('/tags', async (req, res, next) => {
   try {
     const tags = await Product.distinct('tags', { isActive: true });
+    res.set('Cache-Control', SHORT_CACHE);
     res.json(tags.filter(t => t));
   } catch (error) {
     next(error);
@@ -40,6 +46,7 @@ router.get('/tags', async (req, res, next) => {
 router.get('/product-types', async (req, res, next) => {
   try {
     const types = await Product.distinct('productType', { isActive: true });
+    res.set('Cache-Control', SHORT_CACHE);
     res.json(types.filter(t => t));
   } catch (error) {
     next(error);
@@ -109,12 +116,15 @@ router.get('/', validate(listSchema), async (req, res, next) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
+        .select(LIST_FIELDS)
         .skip((page - 1) * limit)
         .limit(limit)
-        .sort(sortQuery),
+        .sort(sortQuery)
+        .lean(),
       Product.countDocuments(query),
     ]);
 
+    res.set('Cache-Control', SHORT_CACHE);
     res.json({ products, page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     next(error);
@@ -123,12 +133,13 @@ router.get('/', validate(listSchema), async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).lean();
     if (!product) {
       const err = new Error('Product not found');
       err.statusCode = 404;
       throw err;
     }
+    res.set('Cache-Control', MEDIUM_CACHE);
     res.json(product);
   } catch (error) {
     next(error);

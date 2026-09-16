@@ -20,11 +20,14 @@ router.get('/public/settings', async (_req, res, next) => {
       'enableDeliveryCharge',
       'deliveryCharge'
     ];
-    const settingsDocs = await Setting.find({ key: { $in: publicKeys } });
+    const settingsDocs = await Setting.find({ key: { $in: publicKeys } })
+      .select({ key: 1, value: 1, _id: 0 })
+      .lean();
     const settings = {};
     settingsDocs.forEach(s => {
       settings[s.key] = s.value;
     });
+    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
     res.json(settings);
   } catch (error) {
     next(error);
