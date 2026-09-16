@@ -65,4 +65,8 @@ docker compose up --build
 - Backend and frontend are containerized for DigitalOcean App Platform style deployments.
 - Configure production secrets via environment variables.
 - Render free-tier deployment is supported via `render.yaml`.
+- Appwrite static deployment is supported from the repository root with:
+  - **Build Command:** `npm run build`
+  - **Output Directory:** `dist`
+  - Set `VITE_API_URL` in Appwrite build environment variables.
 - For low-memory plans, keep `ENABLE_HTTP_LOGS=false` and tune `MONGO_MAX_POOL_SIZE` (default `5`).
