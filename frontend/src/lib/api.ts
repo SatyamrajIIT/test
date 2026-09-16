@@ -3,7 +3,7 @@ import { getApiBaseUrl } from './apiClient';
 const apiBase = getApiBaseUrl();
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, { cache: 'no-store' });
+  const response = await fetch(`${apiBase}${path}`);
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }

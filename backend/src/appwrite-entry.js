@@ -27,6 +27,10 @@ const connectDb = require('./config/db');
 
 let serverPromise = null;
 let dbPromise = null;
+const proxyAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 256,
+});
 
 function getServer() {
   if (!serverPromise) {
@@ -72,6 +76,7 @@ module.exports = async ({ req, res, log, error }) => {
     const proxied = await new Promise((resolve, reject) => {
       const proxyReq = http.request(
         {
+          agent: proxyAgent,
           hostname: '127.0.0.1',
           port,
           path: req.path + (req.queryString ? `?${req.queryString}` : ''),
