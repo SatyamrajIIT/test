@@ -6,7 +6,7 @@
       "name": "Backend API & Frontend Server",
       "runtime": "node-18.0",
       "path": ".",
-      "entrypoint": "backend/src/server.js",
+      "entrypoint": "backend/src/appwrite-entry.js",
       "trigger": "http",
       "events": [],
       "schedule": "",
