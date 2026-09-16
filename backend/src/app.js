@@ -51,8 +51,7 @@ const corsOptions = {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        // Allow same-domain requests (no origin header = browser requests to same domain)
-        callback(null, true);
+        callback(new Error('Not allowed by CORS'));
       }
     } else {
       // Development: allow all

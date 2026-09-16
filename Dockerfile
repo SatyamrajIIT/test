@@ -1,45 +1,59 @@
-# Multi-stage build: Build frontend first, then serve with backend
-FROM node:18-alpine as frontend-builder
+# Production-ready Dockerfile for Appwrite
+# Build: Multi-stage for frontend + backend
+# This MUST work on Appwrite without caching issues
 
-WORKDIR /app/frontend
+FROM node:18-alpine AS frontend-builder
 
-# Copy frontend
-COPY frontend/package*.json ./
-RUN npm ci
+WORKDIR /app
 
-COPY frontend ./
+# Copy frontend files
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm ci --legacy-peer-deps && npm cache clean --force
 
-# Build the frontend
-RUN npm run build
+# Copy all frontend source
+COPY frontend ./frontend
 
-# Final stage: Run backend + serve frontend
+# Build frontend - this creates frontend/dist
+RUN cd frontend && npm run build
+
+# Verify dist exists
+RUN ls -la frontend/dist/ || (echo "ERROR: frontend/dist not created!" && exit 1)
+
+# ============================================================
+# FINAL STAGE: Backend + Frontend
+# ============================================================
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Install production dependencies for backend only
+# Install backend dependencies
 COPY backend/package*.json ./backend/
-WORKDIR /app/backend
-RUN npm ci --production
+RUN cd backend && npm ci --production --legacy-peer-deps && npm cache clean --force
 
 # Copy backend source
-COPY backend/src ./src
-COPY backend/config ./config 2>/dev/null || true
-COPY backend/database ./database 2>/dev/null || true
-COPY backend/scripts ./scripts 2>/dev/null || true
+COPY backend/src ./backend/src
+COPY backend/config ./backend/config 2>/dev/null || true
 
-# Copy built frontend from builder stage
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
+# Copy built frontend from builder
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Set working directory to app root
+# Verify files exist
+RUN echo "=== Checking files ===" && \
+    ls -la backend/src/server.js && \
+    ls -la backend/src/app.js && \
+    ls -la frontend/dist/ && \
+    echo "=== All files ready ==="
+
+# Set working directory
 WORKDIR /app
 
-# Expose port (Appwrite will map this)
+# Port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# Health check - simplified
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=2 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
 
-# Start backend server
-CMD ["node", "backend/src/server.js"]
+# Start server
+# Explicitly set NODE_ENV and other critical vars
+CMD ["sh", "-c", "NODE_ENV=production node backend/src/server.js"]
