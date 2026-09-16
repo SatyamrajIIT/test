@@ -1,38 +1,45 @@
-# Stage 1: Build the frontend
-FROM node:20-alpine AS frontend-builder
+# Multi-stage build: Build frontend first, then serve with backend
+FROM node:18-alpine as frontend-builder
+
 WORKDIR /app/frontend
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+
+# Copy frontend
 COPY frontend/package*.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci
+
 COPY frontend ./
+
+# Build the frontend
 RUN npm run build
 
-# Stage 2: Install backend dependencies
-FROM node:20-alpine AS backend-deps
-WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+# Final stage: Run backend + serve frontend
+FROM node:18-alpine
 
-# Stage 3: Final production image
-FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV NODE_OPTIONS=--max-old-space-size=384
 
-# Copy backend dependencies
-COPY --from=backend-deps /app/backend/node_modules ./backend/node_modules
+# Install production dependencies for backend only
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
+RUN npm ci --production
 
 # Copy backend source
-COPY backend/package*.json ./backend/
-COPY backend/src ./backend/src
-COPY backend/scripts ./backend/scripts
+COPY backend/src ./src
+COPY backend/config ./config 2>/dev/null || true
+COPY backend/database ./database 2>/dev/null || true
+COPY backend/scripts ./scripts 2>/dev/null || true
 
-# Copy frontend build artifacts (now in dist instead of out)
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# Copy built frontend from builder stage
+COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
-WORKDIR /app/backend
-EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/api/health || exit 1
-CMD ["npm", "start"]
+# Set working directory to app root
+WORKDIR /app
+
+# Expose port (Appwrite will map this)
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start backend server
+CMD ["node", "backend/src/server.js"]

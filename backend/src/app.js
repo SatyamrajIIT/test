@@ -23,22 +23,51 @@ const queryOptimizationMiddleware = require('./middleware/queryOptimization');
 
 const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
-
-
 const app = express();
 
-// Trust the proxy since the app is deployed behind DigitalOcean's load balancer.
-// This resolves express-rate-limit 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' errors.
+// Trust the proxy since the app is deployed behind Appwrite's load balancer or DigitalOcean's
 app.set('trust proxy', 1);
 
+// Security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Sometimes needed for Vite/React if assets are loaded dynamically, but better to keep it false or configure it
-}));
-app.use(cors({
-  origin: env.nodeEnv === 'production' ? env.appUrl : '*',
-  credentials: true
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+// CORS - More permissive for Appwrite deployments
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests from the same origin
+    const appUrl = process.env.APP_URL || '';
+    const allowedOrigins = [
+      appUrl,
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ].filter(Boolean);
+
+    // In production, restrict to our domain
+    if (process.env.NODE_ENV === 'production') {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // Allow same-domain requests (no origin header = browser requests to same domain)
+        callback(null, true);
+      }
+    } else {
+      // Development: allow all
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400
+};
+
+app.use(cors(corsOptions));
+
+// Compression and caching middleware
 app.use(compressionMiddleware());
 app.use(cacheMiddleware);
 app.use(queryOptimizationMiddleware);
@@ -49,20 +78,25 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
 
-
+// Body parsing
 app.use(express.json({ limit: '2mb' }));
-if (env.nodeEnv !== 'production' || process.env.ENABLE_HTTP_LOGS === 'true') {
-  app.use(morgan(env.nodeEnv === 'production' ? 'tiny' : 'dev'));
+
+// Logging
+if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_HTTP_LOGS === 'true') {
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'tiny' : 'dev'));
 }
+
+// Global rate limiting
 app.use(
   rateLimit({
-    windowMs: env.rateLimitWindowMs,
-    max: env.rateLimitMax,
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
+    max: Number(process.env.RATE_LIMIT_MAX || 100),
     standardHeaders: true,
     legacyHeaders: false,
   })
 );
 
+// API Routes
 app.use('/api', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -74,21 +108,53 @@ app.use('/api/master', masterRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api', sitemapRoutes);
 
-// Serve frontend static files in production
-if (env.nodeEnv === 'production') {
+// ========================================
+// SERVE FRONTEND STATIC FILES
+// ========================================
+// In production (including Appwrite), serve the built frontend
+if (process.env.NODE_ENV === 'production' || process.env.SERVE_FRONTEND === 'true') {
   const frontendPath = path.join(__dirname, '../../frontend/dist');
-  app.use(express.static(frontendPath));
 
+  // Serve static files with caching
+  app.use(express.static(frontendPath, {
+    maxAge: '1d',
+    etag: false,
+    // Only cache assets, not HTML
+    setHeaders: (res, path) => {
+      if (path.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      } else if (path.match(/\.(js|css|woff2?)$/)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
+
+  // SPA fallback: For all non-API routes that don't match files, serve index.html
   app.get('*', (req, res, next) => {
-    // If it's an API request that wasn't matched above, let it pass to notFound
+    // Skip API routes (let them hit the 404 handler below)
     if (req.path.startsWith('/api')) {
       return next();
     }
-    // Otherwise, send the frontend index.html
-    res.sendFile(path.join(frontendPath, 'index.html'));
+
+    // Skip requests for files that don't exist (images, etc.)
+    const filePath = path.join(frontendPath, req.path);
+    if (path.extname(filePath) && filePath.includes('.')) {
+      return next();
+    }
+
+    // Serve index.html for all other routes (SPA routing)
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
+      if (err) {
+        next(err);
+      }
+    });
   });
 }
 
+// ========================================
+// ERROR HANDLING
+// ========================================
 app.use(notFound);
 app.use(errorHandler);
 

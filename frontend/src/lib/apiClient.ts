@@ -1,6 +1,16 @@
 import { getAuthToken, getRefreshToken, setAuthToken, clearAuth } from './storage';
 
-const apiBase = import.meta.env.VITE_API_URL || '/api';
+export const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+  return 'http://localhost:3000/api';
+};
+
+const apiBase = getApiBaseUrl();
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   let token = getAuthToken();
