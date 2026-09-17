@@ -21,7 +21,7 @@ const compressionMiddleware = require('./middleware/compression');
 const cacheMiddleware = require('./middleware/cache');
 const queryOptimizationMiddleware = require('./middleware/queryOptimization');
 
-const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { apiLimiter, authLimiter, readOperationLimiter, writeOperationLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
@@ -55,7 +55,15 @@ app.use(cacheMiddleware);
 app.use(queryOptimizationMiddleware);
 
 // API rate limiting
-app.use('/api/', apiLimiter);
+app.use('/api/', (req, res, next) => {
+  if (req.method === 'GET') {
+    return readOperationLimiter(req, res, next);
+  }
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    return writeOperationLimiter(req, res, next);
+  }
+  next();
+});
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
@@ -72,7 +80,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_HTTP_LOGS === 't
 app.use(
   rateLimit({
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
-    max: Number(process.env.RATE_LIMIT_MAX || 3000),
+    max: Number(process.env.RATE_LIMIT_MAX || 5000),
     standardHeaders: true,
     legacyHeaders: false,
   })

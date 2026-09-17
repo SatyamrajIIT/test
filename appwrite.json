@@ -80,7 +80,7 @@
         },
         {
           "key": "RATE_LIMIT_MAX",
-          "value": "3000",
+          "value": "5000",
           "required": false
         }
       ]
