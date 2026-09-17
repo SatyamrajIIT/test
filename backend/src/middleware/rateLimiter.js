@@ -26,7 +26,29 @@ const authLimiter = rateLimit({
 });
 
 /**
- * Relaxed rate limiter for general API
+ * Rate limiter for read operations (GET)
+ */
+const readOperationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 500, // 500 requests per minute
+  message: 'Too many read requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Rate limiter for write operations (POST, PUT, DELETE, PATCH)
+ */
+const writeOperationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 150, // 150 requests per minute
+  message: 'Too many write requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Relaxed rate limiter for general API (deprecated, keeping for backwards compatibility)
  */
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -34,4 +56,4 @@ const apiLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
-module.exports = { createRateLimiter, authLimiter, apiLimiter };
+module.exports = { createRateLimiter, authLimiter, apiLimiter, readOperationLimiter, writeOperationLimiter };
