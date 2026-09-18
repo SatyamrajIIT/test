@@ -3,8 +3,16 @@ const TTL = 60 * 1000; // 1 minute
 
 export async function cachedFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const method = options?.method || 'GET';
-  if (method !== 'GET') {
-    return fetch(url, options).then(r => r.json());
+
+  // Do not cache highly dynamic routes or non-GET requests
+  const isDynamicRoute = url.includes('/orders') || url.includes('/cart') || url.includes('/auth') || url.includes('/admin');
+
+  if (method !== 'GET' || isDynamicRoute) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    return response.json();
   }
 
   const key = url;

@@ -6,6 +6,16 @@ module.exports = function responseCacheMiddleware(req, res, next) {
     return next();
   }
 
+  // Skip caching for highly dynamic or user-specific routes that require real-time updates
+  if (
+    req.path.startsWith('/orders') ||
+    req.path.startsWith('/cart') ||
+    req.path.startsWith('/auth') ||
+    req.path.startsWith('/admin')
+  ) {
+    return next();
+  }
+
   // Factor in authentication header to prevent cross-user data leakage
   const authHeader = req.headers.authorization || '';
   const cacheKey = `${req.path}:${JSON.stringify(req.query)}:${authHeader}`;
