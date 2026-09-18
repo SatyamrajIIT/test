@@ -43,8 +43,13 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    fetchCart();
-    fetchWishlist();
+    // Delay loading non-critical data
+    const timer = setTimeout(() => {
+      fetchCart();
+      fetchWishlist();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [fetchCart, fetchWishlist, isAuthenticated]);
 
   const handleLogout = () => {

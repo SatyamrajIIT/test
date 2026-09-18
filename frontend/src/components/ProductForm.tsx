@@ -41,15 +41,13 @@ export default function ProductForm({ onSuccess }: ProductFormProps) {
         const token = getAuthToken();
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        const [catsRes, brsRes, tagsRes] = await Promise.all([
-          fetch(`${apiBase}/master/categories`, { headers }),
-          fetch(`${apiBase}/master/brands`, { headers }),
-          fetch(`${apiBase}/products/tags`)
-        ]);
-
-        if (catsRes.ok) setCategories(await catsRes.json());
-        if (brsRes.ok) setBrands(await brsRes.json());
-        if (tagsRes.ok) setAvailableTags(await tagsRes.json());
+        const res = await fetch(`${apiBase}/master-data`, { headers });
+        if (res.ok) {
+          const { categories, brands, tags } = await res.json();
+          setCategories(categories);
+          setBrands(brands);
+          setAvailableTags(tags);
+        }
       } catch (e) {
         console.error('Error fetching categories/brands/tags', e);
       }
