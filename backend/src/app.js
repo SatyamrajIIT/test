@@ -14,6 +14,7 @@ const adminRoutes = require('./routes/admin');
 const masterRoutes = require('./routes/master');
 const wishlistRoutes = require('./routes/wishlist');
 const sitemapRoutes = require('./routes/sitemap');
+const masterDataRoutes = require('./routes/master-data');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const path = require('path');
 
@@ -21,7 +22,7 @@ const compressionMiddleware = require('./middleware/compression');
 const cacheMiddleware = require('./middleware/cache');
 const queryOptimizationMiddleware = require('./middleware/queryOptimization');
 
-const { apiLimiter, authLimiter, readOperationLimiter, writeOperationLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter, apiLimiter, authLimiter, readOperationLimiter, writeOperationLimiter, skipPreflight } = require('./middleware/rateLimiter');
 
 const app = express();
 
@@ -54,8 +55,12 @@ app.use(compressionMiddleware());
 app.use(cacheMiddleware);
 app.use(queryOptimizationMiddleware);
 
+const responseCacheMiddleware = require('./middleware/responseCache');
+app.use('/api/', responseCacheMiddleware);
+
 // API rate limiting
 app.use('/api/', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
   if (req.method === 'GET') {
     return readOperationLimiter(req, res, next);
   }
@@ -77,14 +82,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_HTTP_LOGS === 't
 }
 
 // Global rate limiting
-app.use(
-  rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 900000),
-    max: Number(process.env.RATE_LIMIT_MAX || 5000),
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+app.use(globalLimiter);
 
 // API Routes
 app.use('/api', healthRoutes);
@@ -95,6 +93,7 @@ app.use('/api/checkout', checkoutRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/master', masterRoutes);
+app.use('/api/master-data', masterDataRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api', sitemapRoutes);
 
