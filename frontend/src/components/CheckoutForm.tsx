@@ -32,6 +32,8 @@ export default function CheckoutForm() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const [formData, setFormData] = useState<CheckoutData>({
     name: '',
     phone: '',
@@ -219,11 +221,65 @@ export default function CheckoutForm() {
     }
 
     if (step === steps.length - 1) {
-      // Open the new tab synchronously to avoid popup blockers
-      const paymentWindow = window.open('about:blank', '_blank');
+      if (isProcessing) {
+        setMessage('Order is already being processed...');
+        return;
+      }
+
+      setIsProcessing(true);
+      setMessage('Processing order...');
+
+      // Open popup synchronously and immediately show loading state
+      const paymentWindow = window.open('', '_blank');
+
+      // Detect popup blocker
+      if (!paymentWindow) {
+        setIsProcessing(false);
+        setMessage('Popup was blocked by your browser. Please disable popup blocker and try again.');
+        return;
+      }
+
+      // Show loading state immediately in popup
+      paymentWindow.document.write(`
+        <html>
+          <head>
+            <title>Processing Payment</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+              }
+              .spinner {
+                width: 50px;
+                height: 50px;
+                border: 4px solid rgba(255,255,255,0.3);
+                border-top-color: white;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+              }
+              @keyframes spin {
+                to { transform: rotate(360deg); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container" style="text-align: center;">
+              <div class="spinner"></div>
+              <h1>Processing Payment</h1>
+              <p>Please wait while we process your order...</p>
+            </div>
+          </body>
+        </html>
+      `);
 
       try {
-        setMessage('Processing order...');
         const res = await fetchWithAuth(`${apiBase}/checkout/create`, {
           method: 'POST',
           headers: {
@@ -247,26 +303,116 @@ export default function CheckoutForm() {
 
         const data = await res.json();
 
-        if (res.ok) {
-          setMessage('Order placed successfully!');
-          // Call clear local cart
+        if (res.ok && data.order) {
+          setMessage('Order placed successfully! Opening order details...');
           useCartStore.getState().clearLocalCart();
 
-          // Update the synchronously opened window to the payment (order details) page
-          if (paymentWindow) {
+          // Navigate popup to order details
+          if (paymentWindow && !paymentWindow.closed) {
             paymentWindow.location.href = `/orders/${data.order._id}`;
           }
 
-          // Redirect the current tab to the home page
-          navigate(`/`);
+          // Redirect main window to home
+          setTimeout(() => {
+            navigate('/');
+          }, 500);
         } else {
-          if (paymentWindow) paymentWindow.close();
-          setMessage(data.message || 'Failed to place order');
+          // Show friendly error message in popup
+          if (paymentWindow && !paymentWindow.closed) {
+            paymentWindow.document.write(`
+              <html>
+                <head>
+                  <title>Order Failed</title>
+                  <style>
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      height: 100vh;
+                      margin: 0;
+                      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                      color: white;
+                    }
+                    .container {
+                      text-align: center;
+                      max-width: 500px;
+                      padding: 20px;
+                    }
+                    button {
+                      margin-top: 20px;
+                      padding: 10px 20px;
+                      background: white;
+                      color: #f5576c;
+                      border: none;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      font-weight: bold;
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <h1>Order Failed ❌</h1>
+                    <p>${data.message || 'Failed to place order. Please try again.'}</p>
+                    <button onclick="window.close()">Close Window</button>
+                  </div>
+                </body>
+              </html>
+            `);
+          }
+
+          setMessage(data.message || 'Failed to place order. Please try again.');
         }
       } catch (err) {
-        if (paymentWindow) paymentWindow.close();
         console.error('Checkout error:', err);
-        setMessage('An error occurred while placing the order.');
+
+        // Show error state in popup
+        if (paymentWindow && !paymentWindow.closed) {
+          paymentWindow.document.write(`
+            <html>
+              <head>
+                <title>Error</title>
+                <style>
+                  body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    color: white;
+                  }
+                  .container {
+                    text-align: center;
+                  }
+                  button {
+                    margin-top: 20px;
+                    padding: 10px 20px;
+                    background: white;
+                    color: #f5576c;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-weight: bold;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Connection Error ⚠️</h1>
+                  <p>An error occurred. Please check your connection and try again.</p>
+                  <button onclick="window.close()">Close Window</button>
+                </div>
+              </body>
+            </html>
+          `);
+        }
+
+        setMessage('An error occurred while placing the order. Please check your connection and try again.');
+      } finally {
+        setIsProcessing(false);
       }
       return;
     }
@@ -466,9 +612,15 @@ export default function CheckoutForm() {
       </section>
       <div className="flex gap-3">
         <button disabled={step === 0} onClick={() => setStep((current) => current - 1)} className="rounded border px-5 py-2 disabled:opacity-50">Back</button>
-        <button disabled={!isLoggedIn && step === 0} onClick={handleNext} className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50">{step === steps.length - 1 ? 'Place Order' : 'Next'}</button>
+        <button
+          disabled={(!isLoggedIn && step === 0) || isProcessing}
+          onClick={handleNext}
+          className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50"
+        >
+          {isProcessing ? 'Processing...' : step === steps.length - 1 ? 'Place Order' : 'Next'}
+        </button>
       </div>
-      {message ? <p className="rounded-md bg-red-50 text-red-600 p-3 text-sm border border-red-200">{message}</p> : null}
+      {message ? <p className={`rounded-md p-3 text-sm border ${message.includes('successfully') ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-200'}`}>{message}</p> : null}
     </div>
   );
 }
