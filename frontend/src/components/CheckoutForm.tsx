@@ -219,6 +219,9 @@ export default function CheckoutForm() {
     }
 
     if (step === steps.length - 1) {
+      // Open the new tab synchronously to avoid popup blockers
+      const paymentWindow = window.open('about:blank', '_blank');
+
       try {
         setMessage('Processing order...');
         const res = await fetchWithAuth(`${apiBase}/checkout/create`, {
@@ -246,13 +249,22 @@ export default function CheckoutForm() {
 
         if (res.ok) {
           setMessage('Order placed successfully!');
-          // Call clear local cart and redirect to order tracking
+          // Call clear local cart
           useCartStore.getState().clearLocalCart();
-          navigate(`/orders/${data.order._id}`);
+
+          // Update the synchronously opened window to the payment (order details) page
+          if (paymentWindow) {
+            paymentWindow.location.href = `/orders/${data.order._id}`;
+          }
+
+          // Redirect the current tab to the home page
+          navigate(`/`);
         } else {
+          if (paymentWindow) paymentWindow.close();
           setMessage(data.message || 'Failed to place order');
         }
       } catch (err) {
+        if (paymentWindow) paymentWindow.close();
         console.error('Checkout error:', err);
         setMessage('An error occurred while placing the order.');
       }
