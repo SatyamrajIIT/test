@@ -58,7 +58,6 @@ export default function Header() {
     clearLocalWishlist();
     setIsAuthenticated(false);
     setIsAdmin(false);
-    setIsMobileMenuOpen(false);
     navigate('/');
   };
 
@@ -111,7 +110,7 @@ export default function Header() {
                 <Link to="/account" className={`${linkClass} flex items-center`} title="Account">
                   <img src="/icons/user.png" alt="Account" className="h-9 w-9 md:h-11 md:w-11 object-contain" loading="eager" fetchPriority="high" />
                 </Link>
-                <button onClick={handleLogout} className={`${linkClass} flex items-center`} title="Logout">
+                <button onClick={handleLogout} className={`${linkClass} hidden sm:flex items-center`} title="Logout">
                   <img src="/icons/logout.png" alt="Logout" className="h-9 w-9 md:h-11 md:w-11 object-contain" loading="eager" fetchPriority="high" />
                 </button>
               </>
@@ -145,20 +144,7 @@ export default function Header() {
             <nav className="flex flex-col px-4 py-2">
               <Link to="/products" className="py-3 border-b border-border/50 text-sm font-medium text-secondary-text hover:text-foreground" onClick={() => setIsMobileMenuOpen(false)}>Shop</Link>
               <Link to="/products?category=Collections" className="py-3 border-b border-border/50 text-sm font-medium text-secondary-text hover:text-foreground" onClick={() => setIsMobileMenuOpen(false)}>Collections</Link>
-              <Link to="/about" className="py-3 border-b border-border/50 text-sm font-medium text-secondary-text hover:text-foreground" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
-
-              {isAdmin && (
-                <Link to="/admin" className="py-3 border-b border-border/50 text-sm font-medium text-secondary-text hover:text-foreground" onClick={() => setIsMobileMenuOpen(false)}>Admin</Link>
-              )}
-
-              {isAuthenticated && (
-                <button
-                  onClick={handleLogout}
-                  className="py-3 text-sm font-medium text-secondary-text hover:text-foreground text-left"
-                >
-                  Logout
-                </button>
-              )}
+              <Link to="/about" className="py-3 text-sm font-medium text-secondary-text hover:text-foreground" onClick={() => setIsMobileMenuOpen(false)}>About</Link>
             </nav>
           </div>
         )}
