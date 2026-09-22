@@ -31,6 +31,10 @@ export default function CheckoutForm() {
   const [promoCode, setPromoCode] = useState('');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  // Set only if the new tab was blocked by the browser, so we can offer a
+  // manual, directly-clicked link (which popup blockers always allow).
+  const [blockedOrderId, setBlockedOrderId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<CheckoutData>({
     name: '',
@@ -219,8 +223,17 @@ export default function CheckoutForm() {
     }
 
     if (step === steps.length - 1) {
-      // Open the new tab synchronously to avoid popup blockers
-      const paymentWindow = window.open('about:blank', '_blank');
+      // Guard against double-clicks opening multiple tabs
+      if (isPlacingOrder) return;
+      setIsPlacingOrder(true);
+      setBlockedOrderId(null);
+
+      // Open the new tab synchronously, in direct response to the click,
+      // so it isn't treated as a popup. It's pointed at a real same-origin
+      // page with real content (not `about:blank`) so it isn't flagged as
+      // a blank window that a script rewrites later, which is the pattern
+      // browsers, ad blockers and security extensions watch for.
+      const paymentWindow = window.open('/order-processing', '_blank');
 
       try {
         setMessage('Processing order...');
@@ -252,21 +265,37 @@ export default function CheckoutForm() {
           // Call clear local cart
           useCartStore.getState().clearLocalCart();
 
-          // Update the synchronously opened window to the payment (order details) page
           if (paymentWindow) {
+            // Move the already-open tab from the loading screen to the order
             paymentWindow.location.href = `/orders/${data.order._id}`;
+          } else {
+            // Tab was blocked (rare, once it's opened synchronously) — the
+            // order still succeeded, so give the user a real link they can
+            // click themselves rather than losing it.
+            setBlockedOrderId(data.order._id);
           }
 
           // Redirect the current tab to the home page
           navigate(`/`);
         } else {
-          if (paymentWindow) paymentWindow.close();
-          setMessage(data.message || 'Failed to place order');
+          const errMsg = data.message || 'Failed to place order';
+          if (paymentWindow) {
+            // Show the error as real content in the tab instead of closing
+            // it abruptly, which some browsers treat as suspicious pop-under
+            // behavior.
+            paymentWindow.location.href = `/order-processing?error=${encodeURIComponent(errMsg)}`;
+          }
+          setMessage(errMsg);
         }
       } catch (err) {
-        if (paymentWindow) paymentWindow.close();
         console.error('Checkout error:', err);
-        setMessage('An error occurred while placing the order.');
+        const errMsg = 'An error occurred while placing the order.';
+        if (paymentWindow) {
+          paymentWindow.location.href = `/order-processing?error=${encodeURIComponent(errMsg)}`;
+        }
+        setMessage(errMsg);
+      } finally {
+        setIsPlacingOrder(false);
       }
       return;
     }
@@ -466,9 +495,17 @@ export default function CheckoutForm() {
       </section>
       <div className="flex gap-3">
         <button disabled={step === 0} onClick={() => setStep((current) => current - 1)} className="rounded border px-5 py-2 disabled:opacity-50">Back</button>
-        <button disabled={!isLoggedIn && step === 0} onClick={handleNext} className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50">{step === steps.length - 1 ? 'Place Order' : 'Next'}</button>
+        <button disabled={(!isLoggedIn && step === 0) || isPlacingOrder} onClick={handleNext} className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50">{step === steps.length - 1 ? (isPlacingOrder ? 'Placing Order...' : 'Place Order') : 'Next'}</button>
       </div>
       {message ? <p className="rounded-md bg-red-50 text-red-600 p-3 text-sm border border-red-200">{message}</p> : null}
+      {blockedOrderId ? (
+        <p className="rounded-md bg-amber-50 text-amber-700 p-3 text-sm border border-amber-200">
+          Your order was placed, but your browser blocked the new tab.{' '}
+          <a href={`/orders/${blockedOrderId}`} target="_blank" rel="noopener noreferrer" className="underline font-semibold">
+            Click here to view your order and pay
+          </a>.
+        </p>
+      ) : null}
     </div>
   );
 }
