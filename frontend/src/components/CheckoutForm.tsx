@@ -32,8 +32,6 @@ export default function CheckoutForm() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [promoMessage, setPromoMessage] = useState('');
 
-  const [isProcessing, setIsProcessing] = useState(false);
-
   const [formData, setFormData] = useState<CheckoutData>({
     name: '',
     phone: '',
@@ -221,18 +219,11 @@ export default function CheckoutForm() {
     }
 
     if (step === steps.length - 1) {
-      if (isProcessing) {
-        setMessage('Order is already being processed...');
-        return;
-      }
-
-      setIsProcessing(true);
-      setMessage('Processing order...');
-
       // Open the new tab synchronously to avoid popup blockers
       const paymentWindow = window.open('about:blank', '_blank');
 
       try {
+        setMessage('Processing order...');
         const res = await fetchWithAuth(`${apiBase}/checkout/create`, {
           method: 'POST',
           headers: {
@@ -276,8 +267,6 @@ export default function CheckoutForm() {
         if (paymentWindow) paymentWindow.close();
         console.error('Checkout error:', err);
         setMessage('An error occurred while placing the order.');
-      } finally {
-        setIsProcessing(false);
       }
       return;
     }
@@ -477,9 +466,7 @@ export default function CheckoutForm() {
       </section>
       <div className="flex gap-3">
         <button disabled={step === 0} onClick={() => setStep((current) => current - 1)} className="rounded border px-5 py-2 disabled:opacity-50">Back</button>
-        <button disabled={(!isLoggedIn && step === 0) || isProcessing} onClick={handleNext} className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50">
-          {isProcessing ? 'Processing...' : step === steps.length - 1 ? 'Place Order' : 'Next'}
-        </button>
+        <button disabled={!isLoggedIn && step === 0} onClick={handleNext} className="rounded bg-foreground hover:bg-black px-5 py-2 font-semibold text-white disabled:opacity-50">{step === steps.length - 1 ? 'Place Order' : 'Next'}</button>
       </div>
       {message ? <p className="rounded-md bg-red-50 text-red-600 p-3 text-sm border border-red-200">{message}</p> : null}
     </div>
