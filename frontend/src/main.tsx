@@ -25,6 +25,7 @@ const CartPage = lazy(() => import('./pages/CartPage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'));
+const OrderProcessingPage = lazy(() => import('./pages/OrderProcessingPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
@@ -70,6 +71,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route path="order-processing" element={<OrderProcessingPage />} />
           <Route path="account" element={<AccountPage />} />
 
           <Route path="auth/login" element={<LoginPage />} />
